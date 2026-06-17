@@ -832,21 +832,24 @@
     const li=keyToLane(e.code); if(li>=0){ e.preventDefault(); pressLane(li); }
   }, {passive:false});
   function pointerLane(x){ for(let i=0;i<5;i++){ if(x>=laneX[i]&&x<laneX[i]+laneW) return i; } return -1; }
-  // slide-to-play: each finger fires a lane the moment it ENTERS it (tap or slide),
-  // and won't re-spam while held in the same lane. Multi-touch handled per pointerId.
-  const ptrLane = new Map();   // pointerId -> last lane it triggered
+  // slide-to-play (piano-tiles feel): while a finger is down, fire EVERY lane it crosses,
+  // even on fast swipes that jump lanes between move samples. Multi-touch tracked per pointerId.
+  const ptrLane = new Map();   // pointerId -> last lane it was in
   function ptrHit(e){
-    if(!game || game.state!=='play'){ return; }
+    if(!game || game.state!=='play') return;
     const li=pointerLane(e.clientX);
-    if(li<0){ ptrLane.set(e.pointerId,-1); return; }       // off the highway: arm a re-entry
-    if(ptrLane.get(e.pointerId)!==li){ ptrLane.set(e.pointerId,li); pressLane(li); }
+    const prev=ptrLane.get(e.pointerId);
+    if(li<0){ ptrLane.set(e.pointerId,-1); return; }     // off the highway: arm a re-entry
+    if(prev===li) return;                                // still in same lane: don't re-spam
+    if(prev==null || prev<0){ pressLane(li); }
+    else { const step=li>prev?1:-1; for(let l=prev+step; l!==li+step; l+=step) pressLane(l); } // sweep crossed lanes
+    ptrLane.set(e.pointerId,li);
   }
-  cv.addEventListener('pointerdown', e=>{ ptrLane.set(e.pointerId,-1); ptrHit(e); }, {passive:true});
+  cv.addEventListener('pointerdown', e=>{ try{ cv.setPointerCapture(e.pointerId); }catch(_){} ptrLane.set(e.pointerId,-1); ptrHit(e); }, {passive:true});
   cv.addEventListener('pointermove', e=>{ if(ptrLane.has(e.pointerId)) ptrHit(e); }, {passive:true});
   const dropPtr = e=> ptrLane.delete(e.pointerId);
   cv.addEventListener('pointerup', dropPtr, {passive:true});
   cv.addEventListener('pointercancel', dropPtr, {passive:true});
-  cv.addEventListener('pointerleave', dropPtr, {passive:true});
 
   // ---------- Menu wiring ----------
   function wireSeg(id,fn){ const seg=document.getElementById(id);
