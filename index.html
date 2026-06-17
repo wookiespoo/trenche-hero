@@ -170,11 +170,10 @@
      Leave blank for a LOCAL (this-device) board.
      Paste your Supabase project URL + anon (public) key to go GLOBAL.
      SQL to create the table is in the chat message. */
-  const SUPABASE_URL = 'https://vihhprynybfhnucuqjkx.supabase.co';        // e.g. 'https://xxxx.supabase.co'
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaGhwcnlueWJmaG51Y3Vxamt4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MDA4MDUsImV4cCI6MjA5NzI3NjgwNX0.Vm7dXB3GvmLrkB83lfgUD5ymEGqej4zSPVv7im2kyTA';   // e.g. 'eyJhbGciOi...'
+  const SUPABASE_URL = '';        // e.g. 'https://xxxx.supabase.co'
+  const SUPABASE_ANON_KEY = '';   // e.g. 'eyJhbGciOi...'
   const LB_TABLE = 'trenche_leaderboard';
   const LB_GLOBAL = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
-  const SUBMIT_FN = SUPABASE_URL ? (SUPABASE_URL + '/functions/v1/submit-score') : '';
 
   // ---------- DOM ----------
   const cv = document.getElementById('c');
@@ -594,15 +593,12 @@
 
   // ---------- Wallet ----------
   function shortKey(k){ return k.slice(0,4)+'…'+k.slice(-4); }
-  function getProvider(){
-    return (window.phantom&&window.phantom.solana) ||
-           (window.solana && (window.solana.isPhantom||window.solana.isSolflare) ? window.solana : null) ||
-           window.solflare || window.solana || null;
-  }
   async function connectWallet(){
     initAudio();
     try{
-      const p = getProvider();
+      const p = (window.phantom&&window.phantom.solana) ||
+                (window.solana && (window.solana.isPhantom||window.solana.isSolflare) ? window.solana : null) ||
+                window.solflare || window.solana;
       if(!p || !p.connect){
         document.getElementById('walletPill').textContent='No wallet — using guest tag';
         document.getElementById('guestName').focus();
@@ -623,40 +619,21 @@
   }
 
   // ---------- Leaderboard ----------
-  // Sign the exact score payload with the connected wallet (ed25519).
-  // The Edge Function verifies this server-side before it writes.
-  async function signScore(payload){
-    const p = getProvider();
-    if(!p || !p.signMessage || !player.wallet) return null;
-    const ts = Date.now();
-    const message = `Trenche Hero\nscore:${payload.score}\nrounds:${payload.rounds}\nmode:${payload.mode}\nwallet:${player.wallet}\nts:${ts}`;
-    try{
-      const res = await p.signMessage(new TextEncoder().encode(message), 'utf8');
-      const sigBytes = new Uint8Array(res && res.signature ? res.signature : res);
-      let bin=''; for(let i=0;i<sigBytes.length;i++) bin+=String.fromCharCode(sigBytes[i]);
-      return { message, signature: btoa(bin) };
-    }catch(e){ return null; }   // user rejected the signature
-  }
   async function submitScore(){
     const tag=(document.getElementById('guestName').value||'').trim();
     const name = player.wallet ? player.name : (tag || 'anon');
     const row={ player:name.slice(0,24), wallet:player.wallet||null, score:Math.floor(game.score), rounds:game.round, mode:game.mode };
-    // GLOBAL board = wallet-signed only (verified via Edge Function)
-    if(LB_GLOBAL && SUBMIT_FN && player.wallet){
-      const signed = await signScore(row);
-      if(signed){
-        try{
-          const res=await fetch(SUBMIT_FN,{
-            method:'POST',
-            headers:{ 'Content-Type':'application/json', apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}` },
-            body:JSON.stringify({ ...row, message:signed.message, signature:signed.signature }) });
-          if(res.ok) return {ok:true, verified:true, global:true, row};
-        }catch(e){}
-      }
+    if(LB_GLOBAL){
+      try{
+        const res=await fetch(`${SUPABASE_URL}/rest/v1/${LB_TABLE}`,{
+          method:'POST',
+          headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'application/json', Prefer:'return=minimal' },
+          body:JSON.stringify(row) });
+        if(res.ok) return {ok:true, row};
+      }catch(e){}
     }
-    // local fallback: guests, no wallet, signature declined, or function unreachable
     try{ const arr=JSON.parse(localStorage.getItem('th_lb')||'[]'); arr.push(row); localStorage.setItem('th_lb',JSON.stringify(arr)); }catch(e){}
-    return {ok:false, verified:false, global:false, row};
+    return {ok:false, row};
   }
   async function fetchBoard(){
     if(LB_GLOBAL){
@@ -711,15 +688,13 @@
     over.classList.add('on');
 
     // submit + compute rank
-    const sub=await submitScore();
+    const {row}=await submitScore();
     const board=await fetchBoard();
-    const rank=board.filter(e=>e.score>sub.row.score).length+1;
-    const within=board.some(e=>e.player===sub.row.player&&e.score===sub.row.score);
+    const rank=board.filter(e=>e.score>row.score).length+1;
+    const within=board.some(e=>e.player===row.player&&e.score===row.score);
     document.getElementById('rankLine').textContent =
-      sub.global && within && rank<=25 ? `🏆 #${rank} on the global board · ✓ verified` :
-      sub.global ? 'score submitted · ✓ verified' :
-      (LB_GLOBAL && !player.wallet) ? 'saved locally — connect a wallet to post to the global board' :
-      (within && rank<=25) ? `🏆 #${rank} on the local board` : 'saved locally';
+      (within && rank<=25) ? `🏆 #${rank} on the ${LB_GLOBAL?'global':'local'} board` :
+      (LB_GLOBAL?'score submitted · not in top 25':'saved locally');
   }
 
   // ---------- Start ----------

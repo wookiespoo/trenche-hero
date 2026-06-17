@@ -42,33 +42,11 @@ The anon key is public by design and safe to commit **because RLS is enabled**
 Connect Phantom/Solflare (injected `window.solana`) to use your address as your
 handle, with a sign-in signature (SIWS). No wallet → type a guest tag.
 
-## Verified scores (anti-cheat)
-The global board accepts **wallet-signed scores only**. On game over the connected
-wallet signs the exact score payload; the `submit-score` Edge Function verifies the
-ed25519 signature, checks the signed message matches the claimed score (anti-tamper),
-rejects stale signatures (anti-replay), bounds the score, and inserts with the
-service-role key. Direct anon inserts are revoked (`supabase/lockdown.sql`), so the
-function is the only write path — forged `curl` POSTs bounce. Guests without a wallet
-get a local-only board.
-
-Deploy it:
-
-```bash
-supabase login
-supabase link --project-ref vihhprynybfhnucuqjkx
-supabase functions deploy submit-score --no-verify-jwt
-```
-
-Then lock direct inserts (SQL Editor, or psql with the lockdown file):
-
-```sql
--- contents of supabase/lockdown.sql
-drop policy if exists "insert any" on trenche_leaderboard;
-```
-
-`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected into the function
-automatically — no secrets to set. Tune `MAX_SCORE` / `MAX_AGE_MS` at the top of
-`supabase/functions/submit-score/index.ts`.
+## Anti-cheat (roadmap)
+Scores are submitted client-side, so they're spoofable — fine for a fun board, not
+tamper-proof. The integrity path: have the wallet sign the score payload, verify the
+ed25519 signature in a Supabase Edge Function, sanity-bound the score, rate-limit per
+wallet, then restrict direct inserts behind that function.
 
 ## Deploy
 Static, so anything works:
