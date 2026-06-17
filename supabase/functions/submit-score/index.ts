@@ -69,22 +69,29 @@ Deno.serve(async (req) => {
   if (!m.ts || Math.abs(Date.now() - m.ts) > MAX_AGE_MS)
     return json({ error: "stale signature" }, 400);
 
-  // 3) insert with service role (bypasses RLS)
+  // 3) keep best-per-wallet via atomic upsert RPC (service role bypasses RLS).
+  //    submit_best() only updates the row when this score beats the wallet's
+  //    current best, so the board stays one clean row per wallet.
   const name = (typeof player === "string" && player.trim())
     ? player.slice(0, 24)
     : `${wallet.slice(0, 4)}…${wallet.slice(-4)}`;
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_best`, {
     method: "POST",
     headers: {
       apikey: SERVICE_ROLE,
       Authorization: `Bearer ${SERVICE_ROLE}`,
       "Content-Type": "application/json",
-      Prefer: "return=minimal",
     },
-    body: JSON.stringify({ player: name, wallet, score: Math.floor(score), rounds, mode }),
+    body: JSON.stringify({
+      p_player: name,
+      p_wallet: wallet,
+      p_score: Math.floor(score),
+      p_rounds: rounds,
+      p_mode: mode,
+    }),
   });
-  if (!res.ok) return json({ error: "insert failed", detail: await res.text() }, 500);
+  if (!res.ok) return json({ error: "write failed", detail: await res.text() }, 500);
 
   return json({ ok: true, verified: true });
 });

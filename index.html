@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#07090d" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="assets/icon-192.png" />
 <title>Trenche Hero — trade the chart</title>
 <style>
   :root{
@@ -31,7 +33,7 @@
 
   .chars{ display:grid; grid-template-columns:repeat(6,1fr); gap:8px; max-width:420px; }
   .char{ background:var(--bg2); border:1px solid #1b2330; border-radius:14px; padding:10px 6px 8px; cursor:pointer; transition:.12s; }
-  .char .emo{ font-size:30px; line-height:1; }
+  .char .emo{ width:38px; height:38px; display:block; margin:0 auto; object-fit:contain; }
   .char .nm{ font-size:9.5px; color:var(--dim); margin-top:5px; letter-spacing:.04em; }
   .char.sel{ border-color:var(--buy); box-shadow:0 0 0 1px var(--buy), 0 0 24px rgba(22,240,138,.25); background:#0d1a14; }
   .char.sel .nm{ color:var(--ink); }
@@ -113,18 +115,40 @@
           <button data-diff="send">Full Send</button>
         </div>
       </div>
+      <div>
+        <div class="lbl" style="margin-bottom:6px">Leverage</div>
+        <div class="seg" id="levSeg">
+          <button data-lev="1" class="on">1x</button>
+          <button data-lev="2">2x</button>
+          <button data-lev="5">5x</button>
+        </div>
+      </div>
     </div>
 
     <div class="row">
       <button class="btn focus-ring" id="playBtn">▶ Enter the Trenches</button>
-      <button class="btn ghost focus-ring" id="lbBtn">🏆 Leaderboard</button>
+      <button class="btn ghost focus-ring" id="lbBtn">Leaderboard</button>
+      <button class="btn ghost focus-ring" id="howtoOpenBtn">How to play</button>
     </div>
 
     <div class="keys">
       <b>Stages:</b> survive escalating rounds — each one faster &amp; denser. &nbsp;·&nbsp; <b>Desktop:</b> D F <b>SPACE</b> J K (or 1–5) &nbsp;·&nbsp; <b>Mobile:</b> tap the lane<br/>
-      Hit the falling candles in their lane. <b style="color:var(--rug)">☠ RUG</b> notes — don't touch, let them pass.
+      Hit the falling candles in their lane. <b style="color:var(--rug)">RUG</b> notes — don't touch, let them pass.
     </div>
     <div class="hint-rot" id="rotHint"></div>
+  </div>
+
+  <!-- HOW TO PLAY -->
+  <div class="screen" id="howto">
+    <div class="title"><div class="big" style="font-size:clamp(28px,7vw,54px)">HOW TO PLAY</div></div>
+    <div class="tag" style="max-width:44ch; text-align:left; line-height:1.9; color:var(--ink)">
+      Candles fall down five lanes. Hit the lane right as a candle crosses the white line.<br/>
+      <span style="color:var(--dim)">Desktop:</span> D · F · SPACE · J · K &nbsp;(or 1–5). &nbsp;<span style="color:var(--dim)">Mobile:</span> tap anywhere in the lane.<br/>
+      Tight timing = <b style="color:var(--buy)">PERFECT</b> hits and combos. Combos multiply your Market Cap.<br/>
+      <b style="color:var(--rug)">RUG</b> notes (red, down-arrow): don't touch — let them fall past the line.<br/>
+      Miss too much and your liquidation bar empties — <b style="color:var(--sell)">LIQUIDATED</b>.
+    </div>
+    <button class="btn focus-ring" id="howtoBtn">Got it</button>
   </div>
 
   <!-- ROUND CLEAR -->
@@ -143,14 +167,14 @@
     <div class="tag" id="rankLine" style="color:var(--moon)"></div>
     <div class="row" style="margin-top:6px">
       <button class="btn focus-ring" id="againBtn">↻ Run it back</button>
-      <button class="btn ghost focus-ring" id="seeLbBtn">🏆 Leaderboard</button>
+      <button class="btn ghost focus-ring" id="seeLbBtn">Leaderboard</button>
       <button class="btn ghost focus-ring" id="menuBtn">Change coin</button>
     </div>
   </div>
 
   <!-- LEADERBOARD -->
   <div class="screen" id="leaderboard">
-    <div class="title"><div class="big" style="font-size:clamp(30px,8vw,60px)">🏆 WALL OF GAINS</div></div>
+    <div class="title"><div class="big" style="font-size:clamp(30px,8vw,60px)">WALL OF GAINS</div></div>
     <div class="lb-scope" id="lbScope"></div>
     <div class="lb" id="lbBody"><div class="empty">loading…</div></div>
     <button class="btn ghost focus-ring" id="lbBack">← Back</button>
@@ -170,10 +194,11 @@
      Leave blank for a LOCAL (this-device) board.
      Paste your Supabase project URL + anon (public) key to go GLOBAL.
      SQL to create the table is in the chat message. */
-  const SUPABASE_URL = '';        // e.g. 'https://xxxx.supabase.co'
-  const SUPABASE_ANON_KEY = '';   // e.g. 'eyJhbGciOi...'
+  const SUPABASE_URL = 'https://vihhprynybfhnucuqjkx.supabase.co';        // e.g. 'https://xxxx.supabase.co'
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaGhwcnlueWJmaG51Y3Vxamt4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MDA4MDUsImV4cCI6MjA5NzI3NjgwNX0.Vm7dXB3GvmLrkB83lfgUD5ymEGqej4zSPVv7im2kyTA';   // e.g. 'eyJhbGciOi...'
   const LB_TABLE = 'trenche_leaderboard';
   const LB_GLOBAL = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+  const SUBMIT_FN = SUPABASE_URL ? (SUPABASE_URL + '/functions/v1/submit-score') : '';
 
   // ---------- DOM ----------
   const cv = document.getElementById('c');
@@ -195,15 +220,35 @@
   const NUMKEYS = ['Digit1','Digit2','Digit3','Digit4','Digit5'];
   const RUG_COLOR = '#ff1f3d';
 
-  // ---------- Characters (emoji avatars — no copyrighted art) ----------
+  // ---------- Characters ----------
+  // Coin-medallion tokens (original art, not the projects' real logos). Drop a
+  // file at  assets/<id>.png  to override any coin with your own art.
+  const ART = {
+    bonk:`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="46" fill="#0c1118" stroke="#ffb02e" stroke-width="3.5"/><circle cx="50" cy="50" r="40" fill="none" stroke="#ffb02e" stroke-opacity="0.3" stroke-width="1"/><path d="M36 44 50 28 64 44M50 28 50 50" fill="none" stroke="#ffb02e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><text x="50" y="76" text-anchor="middle" font-family="monospace" font-weight="700" font-size="14" fill="#ffb02e">$BONK</text></svg>`,
+    wif:`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="46" fill="#0c1118" stroke="#ff7eb6" stroke-width="3.5"/><circle cx="50" cy="50" r="40" fill="none" stroke="#ff7eb6" stroke-opacity="0.3" stroke-width="1"/><path d="M36 46 Q50 24 64 46 Z" fill="#ff7eb6"/><rect x="33" y="44" width="34" height="6" rx="3" fill="#ff7eb6"/><circle cx="50" cy="26" r="3.5" fill="#ff7eb6"/><text x="50" y="78" text-anchor="middle" font-family="monospace" font-weight="700" font-size="16" fill="#ff7eb6">$WIF</text></svg>`,
+    pop:`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="46" fill="#0c1118" stroke="#f6cf57" stroke-width="3.5"/><circle cx="50" cy="50" r="40" fill="none" stroke="#f6cf57" stroke-opacity="0.3" stroke-width="1"/><circle cx="50" cy="37" r="7" fill="none" stroke="#f6cf57" stroke-width="3"/><path d="M50 22V27M50 47V52M35 37H40M60 37H65M40 27 43 30M60 27 57 30M40 47 43 44M60 47 57 44" stroke="#f6cf57" stroke-width="2.5" stroke-linecap="round"/><text x="50" y="78" text-anchor="middle" font-family="monospace" font-weight="700" font-size="16" fill="#f6cf57">$POP</text></svg>`,
+    chad:`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="46" fill="#0c1118" stroke="#cfd6df" stroke-width="3.5"/><circle cx="50" cy="50" r="40" fill="none" stroke="#cfd6df" stroke-opacity="0.3" stroke-width="1"/><path d="M32 46 50 28 68 46" fill="none" stroke="#cfd6df" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 50 50 38 60 50" fill="none" stroke="#cfd6df" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><text x="50" y="78" text-anchor="middle" font-family="monospace" font-weight="700" font-size="13" fill="#cfd6df">$CHAD</text></svg>`,
+    pnut:`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="46" fill="#0c1118" stroke="#c98b4b" stroke-width="3.5"/><circle cx="50" cy="50" r="40" fill="none" stroke="#c98b4b" stroke-opacity="0.3" stroke-width="1"/><path d="M50 26 64 38 50 52 36 38 Z" fill="none" stroke="#c98b4b" stroke-width="3.5" stroke-linejoin="round"/><path d="M42 38 H58" stroke="#c98b4b" stroke-width="2.5"/><text x="50" y="80" text-anchor="middle" font-family="monospace" font-weight="700" font-size="13" fill="#c98b4b">$PNUT</text></svg>`,
+    fart:`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="46" fill="#0c1118" stroke="#7bd66a" stroke-width="3.5"/><circle cx="50" cy="50" r="40" fill="none" stroke="#7bd66a" stroke-opacity="0.3" stroke-width="1"/><path d="M34 32 Q52 24 52 34 Q52 44 40 41M36 46 Q56 38 56 48 Q56 58 44 54" fill="none" stroke="#7bd66a" stroke-width="3" stroke-linecap="round"/><text x="50" y="80" text-anchor="middle" font-family="monospace" font-weight="700" font-size="13" fill="#7bd66a">$FART</text></svg>`,
+  };
   const CHARS = [
-    { id:'bonk', emo:'🐕', nm:'Bonk' },
-    { id:'wif',  emo:'🐶', nm:'dogwifhat', hat:'🧢' },
-    { id:'pop',  emo:'😺', nm:'Popcat' },
-    { id:'chad', emo:'🗿', nm:'GigaChad' },
-    { id:'pnut', emo:'🐿️', nm:'PNUT' },
-    { id:'fart', emo:'💨', nm:'Fartcoin' },
+    { id:'bonk', nm:'Bonk',      tk:'$BONK', col:'#ffb02e' },
+    { id:'wif',  nm:'dogwifhat', tk:'$WIF',  col:'#ff7eb6' },
+    { id:'pop',  nm:'Popcat',    tk:'$POP',  col:'#f6cf57' },
+    { id:'chad', nm:'GigaChad',  tk:'$CHAD', col:'#cfd6df' },
+    { id:'pnut', nm:'PNUT',      tk:'$PNUT', col:'#c98b4b' },
+    { id:'fart', nm:'Fartcoin',  tk:'$FART', col:'#7bd66a' },
   ];
+  CHARS.forEach(c => { c.svg = ART[c.id]; });
+  function artSrc(c){ return 'data:image/svg+xml;utf8,' + encodeURIComponent(c.svg); }
+  function loadCharArt(){
+    CHARS.forEach(c => {
+      const img = new Image();
+      img.onerror = () => { img.onerror = null; img.src = artSrc(c); };
+      img.src = 'assets/' + c.id + '.png';
+      c.image = img;
+    });
+  }
 
   // ---------- Difficulty ----------
   const DIFF = {
@@ -221,7 +266,7 @@
   // ---------- State ----------
   let DPR = 1, W = 0, H = 0;
   let laneX = [], laneW = 0, hitY = 0, topY = 0, pps = 0;
-  let charSel = 'bonk', mode = 'stages', diffKey = 'degen';
+  let charSel = 'bonk', mode = 'stages', diffKey = 'degen', lev = 1;
   let game = null;
   let player = { name:'Guest', wallet:null, signed:false };
 
@@ -256,7 +301,7 @@
   function hat(t){ noise(t,0.04,0.18,7000,musicGain); }
   function bass(t,f){ tone(t,f,STEP*1.8,'sawtooth',0.18,musicGain); }
   function lead(t,f){ tone(t,f,STEP*1.4,'square',0.10,musicGain); }
-  function sfxHit(p){ const t=now(); tone(t,p?880:660,0.10,'triangle',0.4,sfxGain,p?1760:990); if(p) tone(t,1320,0.12,'sine',0.2,sfxGain,2200); }
+  function sfxHit(p, freq){ const t=now(); const f=freq||(p?880:660); tone(t,f,0.10,'triangle',0.4,sfxGain,f*2); if(p) tone(t,f*1.5,0.12,'sine',0.2,sfxGain,f*2.5); }
   function sfxMoon(){ const t=now(); tone(t,440,0.5,'sawtooth',0.3,sfxGain,2400); tone(t,660,0.5,'square',0.18,sfxGain,3200); noise(t,0.5,0.12,600,sfxGain); }
   function sfxRug(){ const t=now(); tone(t,300,0.45,'sawtooth',0.35,sfxGain,60); noise(t,0.4,0.25,200,sfxGain); }
   function sfxMiss(){ tone(now(),180,0.12,'sine',0.2,sfxGain,110); }
@@ -292,11 +337,12 @@
     topY=-60; hitY=H*0.80;
     pps=(hitY-topY)/(DIFF[diffKey].lead);
     document.getElementById('rotHint').textContent =
-      (H>W && W<760) ? 'tip: rotate to landscape for the full highway 📱↻' : '';
+      (H>W && W<760) ? 'best played in landscape — rotate your phone' : '';
   }
   window.addEventListener('resize', resize);
 
   // ---------- Beatmap ----------
+  const SCALE = [330, 392, 440, 523, 587];   // per-lane pitch (A-minor pentatonic-ish)
   // progress 0..1 drives density ramp; round adds extra pressure in Stages.
   function buildMap(durationSec, round, gmode){
     const d=DIFF[diffKey], map=[]; let lastLane=-1;
@@ -314,10 +360,10 @@
       if(lane===lastLane && Math.random()<0.6) lane=(lane+1+((Math.random()*4)|0))%5;
       lastLane=lane;
       const isRug=Math.random() < (d.rugChance+rugPush) && t>5;
-      map.push({t,lane,rug:isRug,hit:false,dead:false});
+      map.push({t,lane,rug:isRug,hit:false,dead:false,pitch:SCALE[lane]});
       if(!isRug && (frac>0.6 || round>=3) && Math.random()<0.12){
         let l2=(lane+1+((Math.random()*3)|0))%5;
-        map.push({t,lane:l2,rug:false,hit:false,dead:false});
+        map.push({t,lane:l2,rug:false,hit:false,dead:false,pitch:SCALE[l2]});
       }
     }
     map.sort((a,b)=>a.t-b.t);
@@ -334,6 +380,7 @@
       health:100, score:0, roundStartScore:0,
       combo:0, maxCombo:0, mult:1,
       hits:0, perfects:0, totalJudged:0, roundHits:0, roundJudged:0,
+      lev:lev, noMiss:true, sumErr:0,
       intensity:0, speed:1,
       laneFlash:[0,0,0,0,0], laneHold:[0,0,0,0,0],
       particles:[], popups:[], shake:0, moonFlash:0,
@@ -371,26 +418,32 @@
     const cx=laneX[li]+laneW/2;
     if(best.rug){
       best.hit=true; best.dead=true;
-      game.health-=20; game.combo=0; game.mult=1; game.shake=14;
+      game.health-=20; game.combo=0; game.mult=1; game.shake=14; game.noMiss=false;
       game.char.state='rugged'; game.char.t=0;
-      burst(cx,hitY,RUG_COLOR,26,9); popup(cx,hitY-40,'RUGGED!',RUG_COLOR); sfxRug(); checkDeath(); return;
+      burst(cx,hitY,RUG_COLOR,26,9); popup(cx,hitY-40,'RUGGED!',RUG_COLOR); sfxRug();
+      if(navigator.vibrate) navigator.vibrate(45);
+      checkDeath(); return;
     }
     best.hit=true; best.dead=true;
+    const signed=game.songTime-best.t;        // + late, - early
     const perfect=bestErr<=PERFECT;
     game.combo++; game.maxCombo=Math.max(game.maxCombo,game.combo);
     game.mult=Math.min(8,1+Math.floor(game.combo/10));
-    game.hits++; game.totalJudged++; game.roundHits++; game.roundJudged++;
+    game.hits++; game.totalJudged++; game.roundHits++; game.roundJudged++; game.sumErr+=signed;
     if(perfect) game.perfects++;
     const d=DIFF[diffKey];
     game.health=Math.min(100, game.health+(perfect?d.heal+0.6:d.heal));
-    game.score += (perfect?100:50)*game.mult;
+    game.score += (perfect?100:50)*game.mult*game.lev;
     burst(cx,hitY,LANES[li].color,perfect?16:9,perfect?7:5);
-    popup(cx,hitY-38, perfect?('PERFECT ×'+game.mult):'GOOD', perfect?LANES[li].color:'#cfd6df');
-    sfxHit(perfect); game.char.state='hit'; game.char.t=0;
+    const tag = perfect ? ('PERFECT ×'+game.mult) : (Math.abs(signed)>PERFECT ? (signed>0?'LATE':'EARLY') : 'GOOD');
+    popup(cx,hitY-38, tag, perfect?LANES[li].color:'#cfd6df');
+    sfxHit(perfect, best.pitch); game.char.state='hit'; game.char.t=0;
+    if(navigator.vibrate) navigator.vibrate(perfect?12:7);
     if(game.combo>0 && game.combo%25===0){
       game.moonFlash=1; game.shake=8; sfxMoon(); game.char.state='moon'; game.char.t=0;
+      if(navigator.vibrate) navigator.vibrate([15,30,15]);
       for(let k=0;k<3;k++) burst(W*Math.random(),H*0.5,'#ffd23f',18,10);
-      popup(W/2,H*0.34,'🚀 TO THE MOON!','#ffd23f');
+      popup(W/2,H*0.34,'▲ TO THE MOON ▲','#ffd23f');
     }
   }
   function checkDeath(){ if(game.health<=0){ game.health=0; game.state='end'; game.endReason='liquidated'; endGame(); } }
@@ -429,7 +482,7 @@
         if(g.songTime-n.t>MISS){
           n.dead=true;
           if(n.rug){ g.score+=30*g.mult; popup(laneX[n.lane]+laneW/2,hitY-30,'RUG DODGED','#36b3ff'); }
-          else { g.combo=0; g.mult=1; g.totalJudged++; g.roundJudged++; g.health-=DIFF[diffKey].drain; g.char.state='idle'; sfxMiss(); checkDeath(); }
+          else { g.combo=0; g.mult=1; g.totalJudged++; g.roundJudged++; g.noMiss=false; g.health-=DIFF[diffKey].drain*(1+(g.lev-1)*0.6); g.char.state='idle'; sfxMiss(); checkDeath(); }
         }
       }
       g.active=g.active.filter(n=>!(n.dead && g.songTime-n.t>0.4));
@@ -531,7 +584,7 @@
     if(n.rug){
       ctx.fillStyle='#1a0608'; ctx.strokeStyle=RUG_COLOR; ctx.lineWidth=2; rrect(cx-w/2,y-bodyH/2,w,bodyH,5); ctx.fill(); ctx.stroke();
       ctx.strokeStyle=RUG_COLOR; ctx.beginPath(); ctx.moveTo(cx,y-bodyH/2-10); ctx.lineTo(cx,y-bodyH/2); ctx.moveTo(cx,y+bodyH/2); ctx.lineTo(cx,y+bodyH/2+10); ctx.stroke();
-      ctx.font='16px serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('☠',cx,y); return;
+      ctx.fillStyle=RUG_COLOR; ctx.beginPath(); ctx.moveTo(cx-6,y-4); ctx.lineTo(cx+6,y-4); ctx.lineTo(cx,y+6); ctx.closePath(); ctx.fill(); return;
     }
     const col=LANES[n.lane].color;
     ctx.strokeStyle=col; ctx.lineWidth=2; ctx.globalAlpha=0.8; ctx.beginPath();
@@ -551,12 +604,21 @@
       case 'gameover': scale=0.85; rot=0.25; break;
       default: dy=Math.sin(performance.now()/300)*5;
     }
-    const size=Math.min(W,H)*0.13;
-    ctx.save(); ctx.translate(baseX+dx,baseY+dy); ctx.rotate(rot); ctx.scale(scale,scale);
-    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font=size+'px serif';
-    ctx.fillText(ch.emo,0,0); if(ch.hat) ctx.fillText(ch.hat,0,-size*0.42); ctx.restore();
+    const size=Math.min(W,H)*0.15;
+    ctx.save(); ctx.translate(baseX+dx,baseY+dy); ctx.rotate(rot);
+    const flip = g.char.state==='moon' ? Math.cos(tt*12) : 1;   // coin flip on moon
+    ctx.scale(scale*flip, scale);
+    if(ch.image && ch.image.complete && ch.image.naturalWidth){
+      ctx.drawImage(ch.image, -size/2, -size/2, size, size);
+    } else {
+      ctx.beginPath(); ctx.arc(0,0,size*0.46,0,Math.PI*2);
+      ctx.fillStyle='#0c1118'; ctx.fill(); ctx.lineWidth=size*0.035; ctx.strokeStyle=ch.col||'#16f08a'; ctx.stroke();
+      ctx.fillStyle=ch.col||'#16f08a'; ctx.font='700 '+(size*0.18)+'px ui-monospace, monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(ch.tk||'$COIN',0,0);
+    }
+    ctx.restore();
     ctx.fillStyle='rgba(124,134,148,0.8)'; ctx.font='700 11px ui-monospace, monospace'; ctx.textAlign='center';
-    ctx.fillText(ch.nm.toUpperCase(), baseX, baseY+size*0.75);
+    ctx.fillText(ch.nm.toUpperCase(), baseX, baseY+size*0.7);
   }
   function fmtCap(v){ v=Math.max(0,v);
     if(v>=1e9) return '$'+(v/1e9).toFixed(2)+'B';
@@ -571,6 +633,7 @@
     ctx.textAlign='right';
     ctx.fillStyle=g.mult>1?'#ffd23f':'#7c8694'; ctx.font='800 '+Math.min(30,W*0.06)+'px ui-monospace, monospace'; ctx.fillText('×'+g.mult,W-16,24);
     ctx.fillStyle='#7c8694'; ctx.font='700 11px ui-monospace, monospace'; ctx.fillText(g.combo+' combo',W-16,56);
+    if(g.lev>1){ ctx.fillStyle='#ff3b5c'; ctx.font='800 12px ui-monospace, monospace'; ctx.fillText(g.lev+'x LEVERAGE',W-16,72); }
     if(g.state==='play'){
       ctx.textAlign='center';
       if(g.mode==='stages'){ ctx.fillStyle='#b06bff'; ctx.font='800 16px ui-monospace, monospace'; ctx.fillText('ROUND '+g.round,W/2,12);
@@ -593,12 +656,15 @@
 
   // ---------- Wallet ----------
   function shortKey(k){ return k.slice(0,4)+'…'+k.slice(-4); }
+  function getProvider(){
+    return (window.phantom&&window.phantom.solana) ||
+           (window.solana && (window.solana.isPhantom||window.solana.isSolflare) ? window.solana : null) ||
+           window.solflare || window.solana || null;
+  }
   async function connectWallet(){
     initAudio();
     try{
-      const p = (window.phantom&&window.phantom.solana) ||
-                (window.solana && (window.solana.isPhantom||window.solana.isSolflare) ? window.solana : null) ||
-                window.solflare || window.solana;
+      const p = getProvider();
       if(!p || !p.connect){
         document.getElementById('walletPill').textContent='No wallet — using guest tag';
         document.getElementById('guestName').focus();
@@ -619,21 +685,40 @@
   }
 
   // ---------- Leaderboard ----------
+  // Sign the exact score payload with the connected wallet (ed25519).
+  // The Edge Function verifies this server-side before it writes.
+  async function signScore(payload){
+    const p = getProvider();
+    if(!p || !p.signMessage || !player.wallet) return null;
+    const ts = Date.now();
+    const message = `Trenche Hero\nscore:${payload.score}\nrounds:${payload.rounds}\nmode:${payload.mode}\nwallet:${player.wallet}\nts:${ts}`;
+    try{
+      const res = await p.signMessage(new TextEncoder().encode(message), 'utf8');
+      const sigBytes = new Uint8Array(res && res.signature ? res.signature : res);
+      let bin=''; for(let i=0;i<sigBytes.length;i++) bin+=String.fromCharCode(sigBytes[i]);
+      return { message, signature: btoa(bin) };
+    }catch(e){ return null; }   // user rejected the signature
+  }
   async function submitScore(){
     const tag=(document.getElementById('guestName').value||'').trim();
     const name = player.wallet ? player.name : (tag || 'anon');
     const row={ player:name.slice(0,24), wallet:player.wallet||null, score:Math.floor(game.score), rounds:game.round, mode:game.mode };
-    if(LB_GLOBAL){
-      try{
-        const res=await fetch(`${SUPABASE_URL}/rest/v1/${LB_TABLE}`,{
-          method:'POST',
-          headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'application/json', Prefer:'return=minimal' },
-          body:JSON.stringify(row) });
-        if(res.ok) return {ok:true, row};
-      }catch(e){}
+    // GLOBAL board = wallet-signed only (verified via Edge Function)
+    if(LB_GLOBAL && SUBMIT_FN && player.wallet){
+      const signed = await signScore(row);
+      if(signed){
+        try{
+          const res=await fetch(SUBMIT_FN,{
+            method:'POST',
+            headers:{ 'Content-Type':'application/json', apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}` },
+            body:JSON.stringify({ ...row, message:signed.message, signature:signed.signature }) });
+          if(res.ok) return {ok:true, verified:true, global:true, row};
+        }catch(e){}
+      }
     }
+    // local fallback: guests, no wallet, signature declined, or function unreachable
     try{ const arr=JSON.parse(localStorage.getItem('th_lb')||'[]'); arr.push(row); localStorage.setItem('th_lb',JSON.stringify(arr)); }catch(e){}
-    return {ok:false, row};
+    return {ok:false, verified:false, global:false, row};
   }
   async function fetchBoard(){
     if(LB_GLOBAL){
@@ -644,6 +729,19 @@
       }catch(e){}
     }
     try{ const arr=JSON.parse(localStorage.getItem('th_lb')||'[]'); return arr.sort((a,b)=>b.score-a.score).slice(0,25); }catch(e){ return []; }
+  }
+  async function fetchRank(score){
+    score=Math.floor(score);
+    if(LB_GLOBAL){
+      try{
+        const res=await fetch(`${SUPABASE_URL}/rest/v1/${LB_TABLE}?select=id&score=gt.${score}`,{
+          headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${SUPABASE_ANON_KEY}`, Prefer:'count=exact', Range:'0-0' } });
+        const cr=res.headers.get('content-range');
+        if(cr){ const tot=parseInt(cr.split('/')[1],10); if(!isNaN(tot)) return tot+1; }
+      }catch(e){}
+      return null;
+    }
+    try{ const arr=JSON.parse(localStorage.getItem('th_lb')||'[]'); return arr.filter(e=>e.score>score).length+1; }catch(e){ return null; }
   }
   async function renderBoard(highlightRow){
     document.getElementById('lbScope').textContent = LB_GLOBAL ? 'GLOBAL · live' : 'LOCAL · this device only (add Supabase keys to go global)';
@@ -666,41 +764,50 @@
     game.char.state = game.endReason==='liquidated' ? 'gameover' : 'moon';
     stopMusic();
     rcScreen.classList.remove('on');
+    const fc = game.noMiss && game.hits>0;
+    if(fc) game.score = Math.floor(game.score*1.15);   // full-combo bonus
     const acc=game.totalJudged?Math.round(100*game.hits/game.totalJudged):0;
+    const grade = (fc&&acc>=95)?'S+': acc>=97?'S': acc>=90?'A': acc>=80?'B': acc>=65?'C':'D';
+    const gradeCol = grade[0]==='S'?'#ffd23f': grade==='A'?'#16f08a': grade==='B'?'#36b3ff': grade==='C'?'#b06bff':'#ff3b5c';
+    const offMs = game.hits? Math.round(game.sumErr/game.hits*1000):0;
+    const offTxt = Math.abs(offMs)<6?'dead on': (offMs>0?`${offMs}ms late`:`${Math.abs(offMs)}ms early`);
     const liq=game.endReason==='liquidated';
     const tEl=document.getElementById('overTitle');
     tEl.textContent = liq ? 'LIQUIDATED' : 'PUMPED IT';
     tEl.style.background = liq?'linear-gradient(90deg,#ff3b5c,#b06bff)':'linear-gradient(90deg,#16f08a,#ffd23f)';
     tEl.style.webkitBackgroundClip='text'; tEl.style.backgroundClip='text';
-    document.getElementById('overSub').textContent = liq
-      ? (game.mode==='stages' ? 'Rugged out on Round '+game.round+'. How far can you push it?' : 'Down bad. The chart rugged you. Run it back.')
-      : 'Pump session complete. Solid bags, ser.';
+    document.getElementById('overSub').textContent =
+      (liq ? (game.mode==='stages'?'Rugged out on Round '+game.round+'.':'The chart rugged you.') : 'Pump session complete, ser.')
+      + (fc?'  ·  FULL COMBO':'') + '  ·  timing ' + offTxt + (game.lev>1?'  ·  '+game.lev+'x':'');
     let hi=0; try{ hi=Math.max(+(localStorage.getItem('th_hi')||0),game.score); localStorage.setItem('th_hi',hi); }catch(e){ hi=game.score; }
-    const roundsStat = game.mode==='stages'
+    const midStat = game.mode==='stages'
       ? `<div><div class="v" style="color:#b06bff">${game.round}</div><div class="k">Rounds reached</div></div>`
       : `<div><div class="v">${game.maxCombo}x</div><div class="k">Max Combo</div></div>`;
     document.getElementById('overStats').innerHTML=`
+      <div><div class="v" style="color:${gradeCol}">${grade}</div><div class="k">Grade</div></div>
       <div><div class="v" style="color:#16f08a">${fmtCap(game.score)}</div><div class="k">Market Cap</div></div>
-      ${roundsStat}
-      <div><div class="v">${acc}%</div><div class="k">Accuracy</div></div>
-      <div><div class="v" style="color:#ffd23f">${fmtCap(hi)}</div><div class="k">All-time Best</div></div>`;
+      ${midStat}
+      <div><div class="v">${acc}%</div><div class="k">Accuracy</div></div>`;
     document.getElementById('rankLine').textContent='submitting score…';
     over.classList.add('on');
 
-    // submit + compute rank
-    const {row}=await submitScore();
+    // submit + standing (works even outside the top 25)
+    const sub=await submitScore();
     const board=await fetchBoard();
-    const rank=board.filter(e=>e.score>row.score).length+1;
-    const within=board.some(e=>e.player===row.player&&e.score===row.score);
-    document.getElementById('rankLine').textContent =
-      (within && rank<=25) ? `🏆 #${rank} on the ${LB_GLOBAL?'global':'local'} board` :
-      (LB_GLOBAL?'score submitted · not in top 25':'saved locally');
+    const inTop=board.findIndex(e=>e.player===sub.row.player&&e.score===sub.row.score);
+    let line;
+    if(sub.global && inTop>=0) line=`#${inTop+1} on the global board · verified ✓`;
+    else if(sub.global){ const r=await fetchRank(game.score); line=r?`your best ranks #${r} globally · verified ✓`:'score submitted · verified ✓'; }
+    else if(LB_GLOBAL && !player.wallet) line='saved locally — connect a wallet to post to the global board';
+    else if(inTop>=0) line=`#${inTop+1} on the local board`;
+    else { const r=await fetchRank(game.score); line=r?`your best ranks #${r} locally`:'saved locally'; }
+    document.getElementById('rankLine').textContent=line;
   }
 
   // ---------- Start ----------
   function start(){
     initAudio(); if(AC.state==='suspended') AC.resume();
-    menu.classList.remove('on'); over.classList.remove('on'); rcScreen.classList.remove('on'); lbScreen.classList.remove('on');
+    menu.classList.remove('on'); over.classList.remove('on'); rcScreen.classList.remove('on'); lbScreen.classList.remove('on'); howto.classList.remove('on');
     game=newGame(); startRound(1);
   }
 
@@ -719,7 +826,11 @@
   const charGrid=document.getElementById('charGrid');
   CHARS.forEach(c=>{
     const el=document.createElement('div'); el.className='char'+(c.id===charSel?' sel':''); el.tabIndex=0;
-    el.innerHTML=`<div class="emo">${c.emo}${c.hat||''}</div><div class="nm">${c.nm}</div>`;
+    const ic=document.createElement('img'); ic.className='emo'; ic.alt=c.nm; ic.draggable=false;
+    ic.onerror=()=>{ ic.onerror=null; ic.src=artSrc(c); };
+    ic.src='assets/'+c.id+'.png';
+    const nm=document.createElement('div'); nm.className='nm'; nm.textContent=c.nm;
+    el.appendChild(ic); el.appendChild(nm);
     el.onclick=()=>{ charSel=c.id; [...charGrid.children].forEach(x=>x.classList.remove('sel')); el.classList.add('sel'); };
     charGrid.appendChild(el);
   });
@@ -727,6 +838,7 @@
     seg.querySelectorAll('button').forEach(b=>{ b.onclick=()=>{ seg.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); fn(b); }; }); }
   wireSeg('modeSeg', b=> mode=b.dataset.mode);
   wireSeg('diffSeg', b=> diffKey=b.dataset.diff);
+  wireSeg('levSeg', b=> lev=+b.dataset.lev);
 
   document.getElementById('playBtn').onclick=start;
   document.getElementById('againBtn').onclick=start;
@@ -740,8 +852,21 @@
   document.getElementById('seeLbBtn').onclick=()=>openBoard(over);
   document.getElementById('lbBack').onclick=()=>{ lbScreen.classList.remove('on'); (game?over:menu).classList.add('on'); };
 
+  // how to play
+  const howto=document.getElementById('howto');
+  document.getElementById('howtoOpenBtn').onclick=()=>{ menu.classList.remove('on'); howto.classList.add('on'); };
+  document.getElementById('howtoBtn').onclick=()=>{ howto.classList.remove('on'); menu.classList.add('on'); try{ localStorage.setItem('th_seen','1'); }catch(e){} };
+
   // ---------- boot ----------
   resize();
+  loadCharArt();
+  // first-time players see how-to instead of the menu
+  let seen=false; try{ seen=!!localStorage.getItem('th_seen'); }catch(e){}
+  if(!seen){ menu.classList.remove('on'); howto.classList.add('on'); }
+  // PWA: install + offline (only when served over http/https)
+  if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+    window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  }
   requestAnimationFrame(frame);
 })();
 </script>
