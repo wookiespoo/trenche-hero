@@ -1,0 +1,15 @@
+# os / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# deploy / tooling
+.vercel
+node_modules/
+*.log
+
+# local env (never commit real secrets; anon key is fine to ship, see README)
+.env
+.env.*
