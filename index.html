@@ -93,11 +93,6 @@
     <div class="title"><div class="big">TRENCHE HERO</div></div>
     <div class="tag">Hit the beats. Pump the chart. Don't get rugged.</div>
 
-    <div>
-      <div class="lbl" style="margin-bottom:8px">Pick your coin</div>
-      <div class="chars" id="charGrid"></div>
-    </div>
-
     <div class="row">
       <div>
         <div class="lbl" style="margin-bottom:6px">Mode</div>
@@ -261,7 +256,7 @@
   const BPM = 128, SPB = 60 / BPM, STEP = SPB / 4;
   const SESSION = 75;            // Quick mode length (s)
   const ROUND_LEN = 33;          // Stages round length (s)
-  const PERFECT = 0.055, GOOD = 0.115, MISS = 0.16;
+  const PERFECT = 0.06, GOOD = 0.12, HIT_EARLY = 0.13, HIT_LATE = 0.26;
 
   // ---------- State ----------
   let DPR = 1, W = 0, H = 0;
@@ -412,8 +407,10 @@
     game.laneFlash[li]=1; game.laneHold[li]=0.12;
     let best=null, bestErr=1e9;
     for(const n of game.active){ if(n.lane!==li||n.hit||n.dead) continue;
-      const err=Math.abs(n.t-game.songTime); if(err<bestErr){ bestErr=err; best=n; } }
-    if(!best || bestErr>GOOD) return; // stray tap = harmless
+      const sg=game.songTime-n.t;                 // + late, - early
+      if(sg < -HIT_EARLY || sg > HIT_LATE) continue;
+      const err=Math.abs(sg); if(err<bestErr){ bestErr=err; best=n; } }
+    if(!best) return; // stray tap = harmless
 
     const cx=laneX[li]+laneW/2;
     if(best.rug){
@@ -479,7 +476,7 @@
 
       for(const n of g.active){
         if(n.hit||n.dead) continue;
-        if(g.songTime-n.t>MISS){
+        if(g.songTime-n.t>HIT_LATE){
           n.dead=true;
           if(n.rug){ g.score+=30*g.mult; popup(laneX[n.lane]+laneW/2,hitY-30,'RUG DODGED','#36b3ff'); }
           else { g.combo=0; g.mult=1; g.totalJudged++; g.roundJudged++; g.noMiss=false; g.health-=DIFF[diffKey].drain*(1+(g.lev-1)*0.6); g.char.state='idle'; sfxMiss(); checkDeath(); }
@@ -544,6 +541,12 @@
     ctx.strokeStyle='rgba(120,150,180,0.08)'; ctx.beginPath(); ctx.moveTo(playLeft+playW,0); ctx.lineTo(playLeft+playW,H); ctx.stroke();
     ctx.save(); ctx.shadowColor='#fff'; ctx.shadowBlur=12; ctx.strokeStyle='rgba(231,236,243,0.55)'; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(playLeft,hitY); ctx.lineTo(playLeft+playW,hitY); ctx.stroke(); ctx.restore();
+    // per-lane target receptors sitting on the hit line
+    for(let i=0;i<5;i++){
+      const rx=laneX[i]+laneW*0.25, rw=laneW*0.5, f=g.laneFlash[i];
+      ctx.fillStyle=hexA(LANES[i].color,0.16+0.7*f); rrect(rx,hitY-3,rw,6,3); ctx.fill();
+      if(f>0){ ctx.save(); ctx.globalAlpha=f; ctx.strokeStyle=LANES[i].color; ctx.lineWidth=2; rrect(rx-3,hitY-8,rw+6,16,8); ctx.stroke(); ctx.restore(); }
+    }
 
     if(g.state==='play'||g.state==='end'){
       for(const n of g.active){ if(n.dead&&n.hit) continue; const y=hitY-(n.t-g.songTime)*pps; if(y<-80||y>H+40) continue; drawNote(n,y); }
@@ -567,7 +570,14 @@
       ctx.font='800 '+(u.text.includes('MOON')?28:18)+'px ui-monospace, monospace'; ctx.fillText(u.text,u.x,u.y); }
     ctx.globalAlpha=1;
 
-    drawCharacter(); drawHUD();
+    // top scrim keeps the HUD readable over notes; vignette adds depth/focus
+    const scrim=ctx.createLinearGradient(0,0,0,130); scrim.addColorStop(0,'rgba(7,9,13,0.92)'); scrim.addColorStop(1,'rgba(7,9,13,0)');
+    ctx.fillStyle=scrim; ctx.fillRect(0,0,W,130);
+    const vig=ctx.createRadialGradient(W/2,H*0.46,Math.min(W,H)*0.28,W/2,H*0.5,Math.max(W,H)*0.72);
+    vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.4)');
+    ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+
+    drawHUD();
 
     // big round banner
     if(g.banner>0 && g.state==='play'){
@@ -590,8 +600,10 @@
     ctx.strokeStyle=col; ctx.lineWidth=2; ctx.globalAlpha=0.8; ctx.beginPath();
     ctx.moveTo(cx,y-bodyH/2-12); ctx.lineTo(cx,y-bodyH/2); ctx.moveTo(cx,y+bodyH/2); ctx.lineTo(cx,y+bodyH/2+12); ctx.stroke(); ctx.globalAlpha=1;
     const near=1-Math.min(1,Math.abs(y-hitY)/120);
-    ctx.save(); ctx.shadowColor=col; ctx.shadowBlur=8+near*14; ctx.fillStyle=col; rrect(cx-w/2,y-bodyH/2,w,bodyH,6); ctx.fill(); ctx.restore();
-    ctx.fillStyle='rgba(255,255,255,0.25)'; rrect(cx-w/2+3,y-bodyH/2+3,w-6,6,3); ctx.fill();
+    ctx.save(); ctx.shadowColor=col; ctx.shadowBlur=8+near*14;
+    const bg=ctx.createLinearGradient(0,y-bodyH/2,0,y+bodyH/2); bg.addColorStop(0,col); bg.addColorStop(1,hexA(col,0.7));
+    ctx.fillStyle=bg; rrect(cx-w/2,y-bodyH/2,w,bodyH,6); ctx.fill(); ctx.restore();
+    ctx.fillStyle='rgba(255,255,255,0.28)'; rrect(cx-w/2+3,y-bodyH/2+3,w-6,6,3); ctx.fill();
   }
   function drawCharacter(){
     const g=game, ch=CHARS.find(c=>c.id===charSel)||CHARS[0];
@@ -628,8 +640,8 @@
   function drawHUD(){
     const g=game;
     ctx.textAlign='left'; ctx.textBaseline='top';
-    ctx.fillStyle='#7c8694'; ctx.font='700 10px ui-monospace, monospace'; ctx.fillText('MARKET CAP',16,14);
-    ctx.fillStyle='#16f08a'; ctx.font='800 '+Math.min(34,W*0.07)+'px ui-monospace, monospace'; ctx.fillText(fmtCap(g.score),16,28);
+    ctx.fillStyle='#7c8694'; ctx.font='700 10px ui-monospace, monospace'; ctx.fillText('MARKET CAP',18,14);
+    ctx.fillStyle='#16f08a'; ctx.font='800 '+Math.min(28,W*0.06)+'px ui-monospace, monospace'; ctx.fillText(fmtCap(g.score),18,28);
     ctx.textAlign='right';
     ctx.fillStyle=g.mult>1?'#ffd23f':'#7c8694'; ctx.font='800 '+Math.min(30,W*0.06)+'px ui-monospace, monospace'; ctx.fillText('×'+g.mult,W-16,24);
     ctx.fillStyle='#7c8694'; ctx.font='700 11px ui-monospace, monospace'; ctx.fillText(g.combo+' combo',W-16,56);
@@ -641,7 +653,7 @@
       else if(g.mode==='quick'){ const left=Math.max(0,g.roundDur-g.songTime); ctx.fillStyle='#e7ecf3'; ctx.font='800 18px ui-monospace, monospace'; ctx.fillText(left.toFixed(0)+'s',W/2,16); }
       else { ctx.fillStyle='#b06bff'; ctx.font='700 12px ui-monospace, monospace'; ctx.fillText('ENDLESS · '+g.speed.toFixed(2)+'x',W/2,18); }
     }
-    const bw=Math.min(220,W*0.34), bx=16, by=70, bh=9, hp=g.health/100;
+    const bw=Math.min(220,W*0.34), bx=18, by=84, bh=9, hp=g.health/100;
     ctx.fillStyle='rgba(255,255,255,0.08)'; rrect(bx,by,bw,bh,5); ctx.fill();
     const col=hp>0.5?'#16f08a':hp>0.25?'#ffd23f':'#ff3b5c'; ctx.fillStyle=col; rrect(bx,by,bw*hp,bh,5); ctx.fill();
     ctx.fillStyle='#7c8694'; ctx.font='700 9px ui-monospace, monospace'; ctx.textAlign='left'; ctx.fillText('LIQUIDATION',bx,by-12);
@@ -823,17 +835,6 @@
   cv.addEventListener('pointerdown', e=>{ if(!game||game.state!=='play') return; const li=pointerLane(e.clientX); if(li>=0) pressLane(li); });
 
   // ---------- Menu wiring ----------
-  const charGrid=document.getElementById('charGrid');
-  CHARS.forEach(c=>{
-    const el=document.createElement('div'); el.className='char'+(c.id===charSel?' sel':''); el.tabIndex=0;
-    const ic=document.createElement('img'); ic.className='emo'; ic.alt=c.nm; ic.draggable=false;
-    ic.onerror=()=>{ ic.onerror=null; ic.src=artSrc(c); };
-    ic.src='assets/'+c.id+'.png';
-    const nm=document.createElement('div'); nm.className='nm'; nm.textContent=c.nm;
-    el.appendChild(ic); el.appendChild(nm);
-    el.onclick=()=>{ charSel=c.id; [...charGrid.children].forEach(x=>x.classList.remove('sel')); el.classList.add('sel'); };
-    charGrid.appendChild(el);
-  });
   function wireSeg(id,fn){ const seg=document.getElementById(id);
     seg.querySelectorAll('button').forEach(b=>{ b.onclick=()=>{ seg.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); fn(b); }; }); }
   wireSeg('modeSeg', b=> mode=b.dataset.mode);
@@ -859,7 +860,6 @@
 
   // ---------- boot ----------
   resize();
-  loadCharArt();
   // first-time players see how-to instead of the menu
   let seen=false; try{ seen=!!localStorage.getItem('th_seen'); }catch(e){}
   if(!seen){ menu.classList.remove('on'); howto.classList.add('on'); }
