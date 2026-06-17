@@ -832,24 +832,34 @@
     const li=keyToLane(e.code); if(li>=0){ e.preventDefault(); pressLane(li); }
   }, {passive:false});
   function pointerLane(x){ for(let i=0;i<5;i++){ if(x>=laneX[i]&&x<laneX[i]+laneW) return i; } return -1; }
-  // slide-to-play (piano-tiles feel): while a finger is down, fire EVERY lane it crosses,
-  // even on fast swipes that jump lanes between move samples. Multi-touch tracked per pointerId.
-  const ptrLane = new Map();   // pointerId -> last lane it was in
-  function ptrHit(e){
+
+  // Per-input lane tracking; fire EVERY lane crossed so fast slides never skip a lane.
+  const lastLaneFor = new Map();   // input id -> last lane it was in
+  function feed(id, clientX){
     if(!game || game.state!=='play') return;
-    const li=pointerLane(e.clientX);
-    const prev=ptrLane.get(e.pointerId);
-    if(li<0){ ptrLane.set(e.pointerId,-1); return; }     // off the highway: arm a re-entry
-    if(prev===li) return;                                // still in same lane: don't re-spam
+    const li=pointerLane(clientX), prev=lastLaneFor.get(id);
+    if(li<0){ lastLaneFor.set(id,-1); return; }       // off the highway: arm a re-entry
+    if(prev===li) return;                              // same lane: don't re-spam
     if(prev==null || prev<0){ pressLane(li); }
-    else { const step=li>prev?1:-1; for(let l=prev+step; l!==li+step; l+=step) pressLane(l); } // sweep crossed lanes
-    ptrLane.set(e.pointerId,li);
+    else { const step=li>prev?1:-1; for(let l=prev+step; l!==li+step; l+=step) pressLane(l); }
+    lastLaneFor.set(id,li);
   }
-  cv.addEventListener('pointerdown', e=>{ try{ cv.setPointerCapture(e.pointerId); }catch(_){} ptrLane.set(e.pointerId,-1); ptrHit(e); }, {passive:true});
-  cv.addEventListener('pointermove', e=>{ if(ptrLane.has(e.pointerId)) ptrHit(e); }, {passive:true});
-  const dropPtr = e=> ptrLane.delete(e.pointerId);
-  cv.addEventListener('pointerup', dropPtr, {passive:true});
-  cv.addEventListener('pointercancel', dropPtr, {passive:true});
+
+  // TOUCH (mobile): the reliable path. preventDefault stops scroll/zoom, the 300ms delay,
+  // and the synthetic mouse events — so the browser can't steal the slide gesture.
+  function touchScan(e){ for(const t of e.changedTouches) feed('t'+t.identifier, t.clientX); }
+  cv.addEventListener('touchstart', e=>{ e.preventDefault(); for(const t of e.changedTouches) lastLaneFor.set('t'+t.identifier,-1); touchScan(e); }, {passive:false});
+  cv.addEventListener('touchmove',  e=>{ e.preventDefault(); touchScan(e); }, {passive:false});
+  const touchEnd = e=>{ for(const t of e.changedTouches) lastLaneFor.delete('t'+t.identifier); };
+  cv.addEventListener('touchend', touchEnd, {passive:true});
+  cv.addEventListener('touchcancel', touchEnd, {passive:true});
+
+  // MOUSE (desktop): click + drag across lanes. (Touch is handled above; touchstart's
+  // preventDefault suppresses the synthetic mouse events, so no double-firing on phones.)
+  let mouseDown=false;
+  cv.addEventListener('mousedown', e=>{ mouseDown=true; lastLaneFor.set('m',-1); feed('m', e.clientX); });
+  cv.addEventListener('mousemove', e=>{ if(mouseDown) feed('m', e.clientX); });
+  window.addEventListener('mouseup', ()=>{ mouseDown=false; lastLaneFor.delete('m'); });
 
   // ---------- Menu wiring ----------
   function wireSeg(id,fn){ const seg=document.getElementById(id);
