@@ -127,7 +127,7 @@
     </div>
 
     <div class="keys">
-      <b>Stages:</b> survive escalating rounds — each one faster &amp; denser. &nbsp;·&nbsp; <b>Desktop:</b> D F <b>SPACE</b> J K (or 1–5) &nbsp;·&nbsp; <b>Mobile:</b> tap the lane<br/>
+      <b>Stages:</b> survive escalating rounds — each one faster &amp; denser. &nbsp;·&nbsp; <b>Desktop:</b> D F <b>SPACE</b> J K (or 1–5) &nbsp;·&nbsp; <b>Mobile:</b> tap or slide across the lanes<br/>
       Hit the falling candles in their lane. <b style="color:var(--rug)">RUG</b> notes — don't touch, let them pass.
     </div>
     <div class="hint-rot" id="rotHint"></div>
@@ -138,7 +138,7 @@
     <div class="title"><div class="big" style="font-size:clamp(28px,7vw,54px)">HOW TO PLAY</div></div>
     <div class="tag" style="max-width:44ch; text-align:left; line-height:1.9; color:var(--ink)">
       Candles fall down five lanes. Hit the lane right as a candle crosses the white line.<br/>
-      <span style="color:var(--dim)">Desktop:</span> D · F · SPACE · J · K &nbsp;(or 1–5). &nbsp;<span style="color:var(--dim)">Mobile:</span> tap anywhere in the lane.<br/>
+      <span style="color:var(--dim)">Desktop:</span> D · F · SPACE · J · K &nbsp;(or 1–5). &nbsp;<span style="color:var(--dim)">Mobile:</span> tap a lane, or slide your finger across lanes to hit them.<br/>
       Tight timing = <b style="color:var(--buy)">PERFECT</b> hits and combos. Combos multiply your Market Cap.<br/>
       <b style="color:var(--rug)">RUG</b> notes (red, down-arrow): don't touch — let them fall past the line.<br/>
       Miss too much and your liquidation bar empties — <b style="color:var(--sell)">LIQUIDATED</b>.
@@ -832,7 +832,21 @@
     const li=keyToLane(e.code); if(li>=0){ e.preventDefault(); pressLane(li); }
   }, {passive:false});
   function pointerLane(x){ for(let i=0;i<5;i++){ if(x>=laneX[i]&&x<laneX[i]+laneW) return i; } return -1; }
-  cv.addEventListener('pointerdown', e=>{ if(!game||game.state!=='play') return; const li=pointerLane(e.clientX); if(li>=0) pressLane(li); });
+  // slide-to-play: each finger fires a lane the moment it ENTERS it (tap or slide),
+  // and won't re-spam while held in the same lane. Multi-touch handled per pointerId.
+  const ptrLane = new Map();   // pointerId -> last lane it triggered
+  function ptrHit(e){
+    if(!game || game.state!=='play'){ return; }
+    const li=pointerLane(e.clientX);
+    if(li<0){ ptrLane.set(e.pointerId,-1); return; }       // off the highway: arm a re-entry
+    if(ptrLane.get(e.pointerId)!==li){ ptrLane.set(e.pointerId,li); pressLane(li); }
+  }
+  cv.addEventListener('pointerdown', e=>{ ptrLane.set(e.pointerId,-1); ptrHit(e); }, {passive:true});
+  cv.addEventListener('pointermove', e=>{ if(ptrLane.has(e.pointerId)) ptrHit(e); }, {passive:true});
+  const dropPtr = e=> ptrLane.delete(e.pointerId);
+  cv.addEventListener('pointerup', dropPtr, {passive:true});
+  cv.addEventListener('pointercancel', dropPtr, {passive:true});
+  cv.addEventListener('pointerleave', dropPtr, {passive:true});
 
   // ---------- Menu wiring ----------
   function wireSeg(id,fn){ const seg=document.getElementById(id);
